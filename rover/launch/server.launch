@@ -1,0 +1,3 @@
+<launch>
+  <node pkg="brorover_server" type="server.py" name="brorover_server" output="screen" />
+</launch>

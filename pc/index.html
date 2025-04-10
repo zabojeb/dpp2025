@@ -1,0 +1,1405 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>БРОРОВЕР - Панель управления</title>
+    <link rel="icon" type="image/x-icon" href="favicon.ico" />
+    <!-- Подключаем Socket.IO клиентскую библиотеку -->
+    <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+    <style>
+      :root {
+        --primary-color: #2c3e50;
+        --secondary-color: #3498db;
+        --accent-color: #e74c3c;
+        --bg-color: #f5f7fa;
+        --text-color: #2c3e50;
+        --border-radius: 8px;
+        --box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font-family: "Segoe UI", Roboto, Arial, sans-serif;
+        background-color: var(--bg-color);
+        color: var(--text-color);
+        line-height: 1.6;
+        padding: 20px;
+      }
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+      header {
+        text-align: center;
+        margin-bottom: 30px;
+      }
+      h1 {
+        font-size: 2.5rem;
+        color: var(--primary-color);
+        margin: 10px 0;
+      }
+      .status-indicator {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        background-color: #27ae60;
+        border-radius: 50%;
+        margin-right: 8px;
+      }
+      .status-text {
+        font-size: 0.9rem;
+        color: #27ae60;
+      }
+      .video-feeds {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 30px;
+        gap: 20px;
+      }
+      .video-feed {
+        flex: 1;
+        position: relative;
+        border-radius: var(--border-radius);
+        overflow: hidden;
+        box-shadow: var(--box-shadow);
+      }
+      .video-feed img {
+        width: 100%;
+        height: auto;
+        display: block;
+      }
+      .video-label {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        background-color: rgba(0, 0, 0, 0.6);
+        color: white;
+        padding: 5px 10px;
+        border-radius: 4px;
+        font-size: 0.8rem;
+      }
+      .control-section {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 30px;
+        margin-bottom: 30px;
+      }
+      .controls,
+      .telemetry {
+        background-color: white;
+        border-radius: var(--border-radius);
+        padding: 20px;
+        box-shadow: var(--box-shadow);
+      }
+      .control-title {
+        font-size: 1.2rem;
+        color: var(--primary-color);
+        margin-bottom: 15px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+      }
+      .control-title svg {
+        margin-right: 10px;
+      }
+      .slider-container {
+        margin-bottom: 20px;
+      }
+      .slider-label {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 8px;
+      }
+      .slider-label span {
+        font-weight: 500;
+      }
+      .slider-value {
+        color: var(--secondary-color);
+      }
+      input[type="range"] {
+        width: 100%;
+        -webkit-appearance: none;
+        height: 8px;
+        border-radius: 4px;
+        background: #dfe6e9;
+        outline: none;
+      }
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: var(--secondary-color);
+        cursor: pointer;
+      }
+      .telemetry-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+      }
+      .telemetry-item {
+        background-color: #f8f9fa;
+        padding: 12px;
+        border-radius: 6px;
+      }
+      .telemetry-item p {
+        margin: 0;
+      }
+      .telemetry-label {
+        font-size: 0.8rem;
+        color: #7f8c8d;
+        margin-bottom: 5px;
+      }
+      .telemetry-value {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: var(--primary-color);
+      }
+      .map-container {
+        background-color: white;
+        border-radius: var(--border-radius);
+        padding: 20px;
+        box-shadow: var(--box-shadow);
+        margin-bottom: 30px;
+      }
+      #robotCanvas {
+        display: block;
+        margin: 0 auto;
+        background-color: #f8f9fa;
+        border-radius: var(--border-radius);
+        border: none;
+      }
+      .map-legend {
+        display: flex;
+        justify-content: center;
+        margin-top: 15px;
+        font-size: 0.9rem;
+      }
+      .legend-item {
+        display: flex;
+        align-items: center;
+        margin: 0 10px;
+      }
+      .legend-color {
+        width: 12px;
+        height: 12px;
+        border-radius: 2px;
+        margin-right: 5px;
+      }
+      .keyboard-guide {
+        background-color: white;
+        border-radius: var(--border-radius);
+        padding: 15px;
+        text-align: center;
+        margin-bottom: 30px;
+        box-shadow: var(--box-shadow);
+      }
+      .key {
+        display: inline-block;
+        padding: 8px 12px;
+        background-color: #f1f2f6;
+        border: 1px solid #dcdde1;
+        border-radius: 4px;
+        margin: 0 5px;
+        font-weight: bold;
+        min-width: 35px;
+        text-align: center;
+      }
+      .key-description {
+        display: inline-block;
+        margin-right: 15px;
+      }
+      .action-buttons {
+        display: flex;
+        justify-content: center;
+        gap: 15px;
+        margin-bottom: 30px;
+      }
+      button {
+        background-color: var(--secondary-color);
+        color: white;
+        border: none;
+        padding: 12px 25px;
+        font-size: 1rem;
+        font-weight: 500;
+        border-radius: var(--border-radius);
+        cursor: pointer;
+        transition: background-color 0.3s;
+        display: flex;
+        align-items: center;
+      }
+      button svg {
+        margin-right: 8px;
+      }
+      button:hover {
+        background-color: #2980b9;
+      }
+      button.danger {
+        background-color: var(--accent-color);
+      }
+      button.danger:hover {
+        background-color: #c0392b;
+      }
+      .direction-indicator {
+        position: relative;
+        height: 30px;
+        margin: 20px 0;
+      }
+      #directionIndicator {
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: rgba(44, 62, 80, 0.8);
+        color: white;
+        padding: 5px 15px;
+        border-radius: 20px;
+        font-weight: 500;
+        transition: all 0.3s ease;
+      }
+      .joystick-display {
+        background-color: white;
+        border-radius: var(--border-radius);
+        padding: 20px;
+        box-shadow: var(--box-shadow);
+        margin-bottom: 30px;
+      }
+
+      .display-title {
+        font-size: 1.2rem;
+        margin-bottom: 20px;
+        color: var(--primary-color);
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .display-content {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 30px;
+      }
+
+      .display-section {
+        border-radius: var(--border-radius);
+        background-color: #f8f9fa;
+        padding: 15px;
+        position: relative;
+      }
+
+      .section-title {
+        font-size: 1rem;
+        margin-bottom: 15px;
+        color: var(--primary-color);
+        font-weight: 500;
+      }
+
+      .joystick-container {
+        position: relative;
+        width: 180px;
+        height: 180px;
+        border-radius: 50%;
+        background: linear-gradient(145deg, #e6e6e6, #ffffff);
+        box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.1);
+        margin: 0 auto 15px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .joystick-base {
+        position: absolute;
+        width: 180px;
+        height: 180px;
+        border-radius: 50%;
+        overflow: hidden;
+      }
+
+      .joystick-grid {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+      }
+
+      .joystick-grid::before,
+      .joystick-grid::after {
+        content: "";
+        position: absolute;
+        background-color: rgba(44, 62, 80, 0.1);
+      }
+
+      .joystick-grid::before {
+        width: 1px;
+        height: 100%;
+        left: 50%;
+      }
+
+      .joystick-grid::after {
+        width: 100%;
+        height: 1px;
+        top: 50%;
+      }
+
+      .joystick-deadzone {
+        position: absolute;
+        width: 30%;
+        height: 30%;
+        border-radius: 50%;
+        border: 1px dashed rgba(44, 62, 80, 0.3);
+        pointer-events: none;
+      }
+
+      .joystick-handle {
+        position: absolute;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: var(--secondary-color);
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        transform: translate(-50%, -50%);
+        transition: all 0.1s ease;
+        cursor: pointer;
+      }
+
+      .joystick-values {
+        display: flex;
+        justify-content: space-around;
+        margin-bottom: 10px;
+      }
+
+      .value-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .value-label {
+        font-size: 0.8rem;
+        color: #7f8c8d;
+        margin-bottom: 5px;
+      }
+
+      .value-number {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: var(--primary-color);
+      }
+
+      .buttons-section {
+        display: flex;
+        justify-content: space-around;
+        margin-top: 20px;
+      }
+
+      .button-display {
+        position: relative;
+        width: 60px;
+        height: 60px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .button-circle {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background-color: #ddd;
+        box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.2);
+        margin-bottom: 5px;
+        transition: all 0.2s ease;
+      }
+
+      .button-circle.active {
+        background-color: var(--success-color);
+        box-shadow: 0 0 10px rgba(46, 204, 113, 0.6);
+      }
+
+      .button-label {
+        font-size: 0.75rem;
+        text-align: center;
+        color: var(--text-color);
+      }
+
+      .mode-indicator {
+        position: absolute;
+        top: 15px;
+        right: 15px;
+        padding: 5px 10px;
+        border-radius: 15px;
+        font-size: 0.8rem;
+        font-weight: bold;
+        background-color: var(--secondary-color);
+        color: white;
+      }
+
+      .potentiometer-container {
+        width: 100%;
+        margin: 20px 0;
+      }
+
+      .potentiometer-bar {
+        width: 100%;
+        height: 15px;
+        background-color: #ddd;
+        border-radius: 7.5px;
+        overflow: hidden;
+        position: relative;
+      }
+
+      .potentiometer-fill {
+        height: 100%;
+        background-color: var(--secondary-color);
+        width: 50%;
+        transition: width 0.3s ease;
+      }
+
+      .potentiometer-value {
+        margin-top: 5px;
+        text-align: center;
+        font-size: 0.9rem;
+        color: var(--text-color);
+      }
+
+      @media (max-width: 768px) {
+        .display-content {
+          grid-template-columns: 1fr;
+          gap: 20px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>БРОРОВЕР</h1>
+        <div>
+          <span class="status-indicator"></span>
+          <span class="status-text">Подключен и готов к управлению</span>
+        </div>
+      </header>
+
+      <!-- Видео с ровера и станции -->
+      <div class="video-feeds">
+        <div class="video-feed">
+          <div class="video-label">Камера ровера</div>
+          <img
+            src="http://192.168.1.133:9999/stream?topic=/front_camera/image_raw"
+            alt="Поток с камеры ровера"
+          />
+        </div>
+        <div class="video-feed">
+          <div class="video-label">Вид со станции</div>
+          <img
+            src="http://192.168.1.96:9999/stream?topic=/front_camera/image_raw"
+            alt="Поток со станции"
+          />
+        </div>
+      </div>
+
+      <!-- Индикатор направления движения -->
+      <div class="direction-indicator">
+        <div id="directionIndicator">Ровер остановлен</div>
+      </div>
+
+      <!-- Основной блок управления и телеметрии -->
+      <div class="control-section">
+        <div class="controls">
+          <div class="control-title">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M12 15C13.6569 15 15 13.6569 15 12C15 10.3431 13.6569 9 12 9C10.3431 9 9 10.3431 9 12C9 13.6569 10.3431 15 12 15Z"
+                stroke="#2c3e50"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+              <path
+                d="M19.4 15C19.2669 15.3016 19.2272 15.6362 19.286 15.9606C19.3448 16.285 19.4995 16.5843 19.73 16.82L19.79 16.88C19.976 17.0657 20.1235 17.2863 20.2241 17.5291C20.3248 17.7719 20.3766 18.0322 20.3766 18.295C20.3766 18.5578 20.3248 18.8181 20.2241 19.0609C20.1235 19.3037 19.976 19.5243 19.79 19.71C19.6043 19.896 19.3837 20.0435 19.1409 20.1441C18.8981 20.2448 18.6378 20.2966 18.375 20.2966C18.1122 20.2966 17.8519 20.2448 17.6091 20.1441C17.3663 20.0435 17.1457 19.896 16.96 19.71L16.9 19.65C16.6643 19.4195 16.365 19.2648 16.0406 19.206C15.7162 19.1472 15.3816 19.1869 15.08 19.32C14.7842 19.4468 14.532 19.6572 14.3543 19.9255C14.1766 20.1938 14.0813 20.5082 14.08 20.83V21C14.08 21.5304 13.8693 22.0391 13.4942 22.4142C13.1191 22.7893 12.6104 23 12.08 23C11.5496 23 11.0409 22.7893 10.6658 22.4142C10.2907 22.0391 10.08 21.5304 10.08 21V20.91C10.0723 20.579 9.96512 20.258 9.77251 19.9887C9.5799 19.7194 9.31074 19.5143 9 19.4C8.69838 19.2669 8.36381 19.2272 8.03941 19.286C7.71502 19.3448 7.41568 19.4995 7.18 19.73L7.12 19.79C6.93425 19.976 6.71368 20.1235 6.47088 20.2241C6.22808 20.3248 5.96783 20.3766 5.705 20.3766C5.44217 20.3766 5.18192 20.3248 4.93912 20.2241C4.69632 20.1235 4.47575 19.976 4.29 19.79C4.10405 19.6043 3.95653 19.3837 3.85588 19.1409C3.75523 18.8981 3.70343 18.6378 3.70343 18.375C3.70343 18.1122 3.75523 17.8519 3.85588 17.6091C3.95653 17.3663 4.10405 17.1457 4.29 16.96L4.35 16.9C4.58054 16.6643 4.73519 16.365 4.794 16.0406C4.85282 15.7162 4.81312 15.3816 4.68 15.08C4.55324 14.7842 4.34276 14.532 4.07447 14.3543C3.80618 14.1766 3.49179 14.0813 3.17 14.08H3C2.46957 14.08 1.96086 13.8693 1.58579 13.4942C1.21071 13.1191 1 12.6104 1 12C1 11.5496 1.21071 11.0409 1.58579 10.6658C1.96086 10.2907 2.46957 10.08 3 10.08H3.09C3.42099 10.0723 3.742 9.96512 4.0113 9.77251C4.28059 9.5799 4.48572 9.31074 4.6 9C4.73312 8.69838 4.77282 8.36381 4.714 8.03941C4.65519 7.71502 4.50054 7.41568 4.27 7.18L4.21 7.12C4.02405 6.93425 3.87653 6.71368 3.77588 6.47088C3.67523 6.22808 3.62343 5.96783 3.62343 5.705C3.62343 5.44217 3.67523 5.18192 3.77588 4.93912C3.87653 4.69632 4.02405 4.47575 4.21 4.29C4.39575 4.10405 4.61632 3.95653 4.85912 3.85588C5.10192 3.75523 5.36217 3.70343 5.625 3.70343C5.88783 3.70343 6.14808 3.75523 6.39088 3.85588C6.63368 3.95653 6.85425 4.10405 7.04 4.29L7.1 4.35C7.33568 4.58054 7.63502 4.73519 7.95941 4.794C8.28381 4.85282 8.61838 4.81312 8.92 4.68H9C9.29577 4.55324 9.54802 4.34276 9.72569 4.07447C9.90337 3.80618 9.99872 3.49179 10 3.17V3C10 2.46957 10.2107 1.96086 10.5858 1.58579C10.9609 1.21071 11.4696 1 12 1C12.5304 1 13.0391 1.21071 13.4142 1.58579C13.7893 1.96086 14 2.46957 14 3V3.09C14.0013 3.41179 14.0966 3.72618 14.2743 3.99447C14.452 4.26276 14.7042 4.47324 15 4.6C15.3016 4.73312 15.6362 4.77282 15.9606 4.714C16.285 4.65519 16.5843 4.50054 16.82 4.27L16.88 4.21C17.0657 4.02405 17.2863 3.87653 17.5291 3.77588C17.7719 3.67523 18.0322 3.62343 18.295 3.62343C18.5578 3.62343 18.8181 3.67523 19.0609 3.77588C19.3037 3.87653 19.5243 4.02405 19.71 4.21C19.896 4.39575 20.0435 4.61632 20.1441 4.85912C20.2448 5.10192 20.2966 5.36217 20.2966 5.625C20.2966 5.88783 20.2448 6.14808 20.1441 6.39088C20.0435 6.63368 19.896 6.85425 19.71 7.04L19.65 7.1C19.4195 7.33568 19.2648 7.63502 19.206 7.95941C19.1472 8.28381 19.1869 8.61838 19.32 8.92V9C19.4468 9.29577 19.6572 9.54802 19.9255 9.72569C20.1938 9.90337 20.5082 9.99872 20.83 10H21C21.5304 10 22.0391 10.2107 22.4142 10.5858C22.7893 10.9609 23 11.4696 23 12C23 12.5304 22.7893 13.0391 22.4142 13.4142C22.0391 13.7893 21.5304 14 21 14H20.91C20.5882 14.0013 20.2738 14.0966 20.0055 14.2743C19.7372 14.452 19.5268 14.7042 19.4 15Z"
+                stroke="#2c3e50"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            Настройки управления
+          </div>
+
+          <div class="slider-container">
+            <div class="slider-label">
+              <span>Линейная скорость</span>
+              <span class="slider-value" id="linearSpeedValue">0.50 м/с</span>
+            </div>
+            <input
+              type="range"
+              id="linearSpeedSlider"
+              min="0"
+              max="1"
+              step="0.01"
+              value="0.5"
+            />
+          </div>
+
+          <div class="slider-container">
+            <div class="slider-label">
+              <span>Угловая скорость</span>
+              <span class="slider-value" id="angularSpeedValue"
+                >0.50 рад/с</span
+              >
+            </div>
+            <input
+              type="range"
+              id="angularSpeedSlider"
+              min="0"
+              max="1"
+              step="0.01"
+              value="0.5"
+            />
+          </div>
+
+          <div class="slider-container">
+            <div class="slider-label">
+              <span>Скорость сервоприводов</span>
+              <span class="slider-value" id="servoSpeedValue">15 тиков</span>
+            </div>
+            <input
+              type="range"
+              id="servoSpeedSlider"
+              min="0"
+              max="45"
+              step="1"
+              value="15"
+            />
+          </div>
+        </div>
+
+        <div class="telemetry">
+          <div class="control-title">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M21 12C21 13.1819 20.7672 14.3522 20.3149 15.4442C19.8626 16.5361 19.1997 17.5282 18.364 18.364C17.5282 19.1997 16.5361 19.8626 15.4442 20.3149C14.3522 20.7672 13.1819 21 12 21C10.8181 21 9.64778 20.7672 8.55585 20.3149C7.46392 19.8626 6.47177 19.1997 5.63604 18.364C4.80031 17.5282 4.13738 16.5361 3.68508 15.4442C3.23279 14.3522 3 13.1819 3 12C3 9.61305 3.94821 7.32387 5.63604 5.63604C7.32387 3.94821 9.61305 3 12 3C14.3869 3 16.6761 3.94821 18.364 5.63604C20.0518 7.32387 21 9.61305 21 12Z"
+                stroke="#2c3e50"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+              <path
+                d="M16.51 8.50001L12 12"
+                stroke="#2c3e50"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            Одометрия
+          </div>
+
+          <div class="telemetry-grid">
+            <div class="telemetry-item">
+              <p class="telemetry-label">Линейная скорость</p>
+              <p class="telemetry-value" id="currentLinear">0.00 м/с</p>
+            </div>
+
+            <div class="telemetry-item">
+              <p class="telemetry-label">Угловая скорость</p>
+              <p class="telemetry-value" id="currentAngular">0.00 рад/с</p>
+            </div>
+
+            <div class="telemetry-item">
+              <p class="telemetry-label">Позиция X</p>
+              <p class="telemetry-value" id="odomX">0.00 м</p>
+            </div>
+
+            <div class="telemetry-item">
+              <p class="telemetry-label">Позиция Y</p>
+              <p class="telemetry-value" id="odomY">0.00 м</p>
+            </div>
+
+            <div class="telemetry-item">
+              <p class="telemetry-label">Угол поворота</p>
+              <p class="telemetry-value" id="odomTheta">0°</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Блок отображения джойстика -->
+      <div class="joystick-display">
+        <div class="display-title">
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M21 17H3V7H21M21 17V7M21 17C21.5304 17 22.0391 16.7893 22.4142 16.4142C22.7893 16.0391 23 15.5304 23 15V9C23 8.46957 22.7893 7.96086 22.4142 7.58579C22.0391 7.21071 21.5304 7 21 7"
+              stroke="#2c3e50"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <path
+              d="M12 12V14"
+              stroke="#2c3e50"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <path
+              d="M14 14L14 12"
+              stroke="#2c3e50"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <path
+              d="M16 13H18"
+              stroke="#2c3e50"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <path
+              d="M8 13C8 14.1046 7.10457 15 6 15C4.89543 15 4 14.1046 4 13C4 11.8954 4.89543 11 6 11C7.10457 11 8 11.8954 8 13Z"
+              stroke="#2c3e50"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+          Данные контроллера
+        </div>
+        <div class="display-content">
+          <!-- Джойстик 1 -->
+          <div class="display-section">
+            <div class="section-title">Джойстик 1 (Движение)</div>
+            <div class="joystick-container">
+              <div class="joystick-base">
+                <div class="joystick-grid"></div>
+                <div class="joystick-deadzone"></div>
+              </div>
+              <div id="joystick1" class="joystick-handle"></div>
+            </div>
+            <div class="joystick-values">
+              <div class="value-item">
+                <div class="value-label">X</div>
+                <div id="joy1X" class="value-number">0.00</div>
+              </div>
+              <div class="value-item">
+                <div class="value-label">Y</div>
+                <div id="joy1Y" class="value-number">0.00</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Джойстик 2 -->
+          <div class="display-section">
+            <div class="section-title">Джойстик 2 (Сервоприводы)</div>
+            <div class="mode-indicator" id="servoMode">Режим 1</div>
+            <div class="joystick-container">
+              <div class="joystick-base">
+                <div class="joystick-grid"></div>
+                <div class="joystick-deadzone"></div>
+              </div>
+              <div id="joystick2" class="joystick-handle"></div>
+            </div>
+            <div class="joystick-values">
+              <div class="value-item">
+                <div class="value-label">X</div>
+                <div id="joy2X" class="value-number">0.00</div>
+              </div>
+              <div class="value-item">
+                <div class="value-label">Y</div>
+                <div id="joy2Y" class="value-number">0.00</div>
+              </div>
+            </div>
+            <div class="buttons-section">
+              <div class="button-display">
+                <div id="modeButton" class="button-circle"></div>
+                <div class="button-label">Режим</div>
+              </div>
+              <div class="button-display">
+                <div id="servoButton" class="button-circle"></div>
+                <div class="button-label">Захват</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Потенциометр -->
+        <div class="display-section" style="margin-top: 20px">
+          <div class="section-title">Потенциометр</div>
+          <div class="potentiometer-container">
+            <div class="potentiometer-bar">
+              <div id="potFill" class="potentiometer-fill"></div>
+            </div>
+            <div id="potValue" class="potentiometer-value">50%</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Карта перемещения -->
+      <div class="map-container">
+        <div class="control-title">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M1 6V22L8 18L16 22L23 18V2L16 6L8 2L1 6Z"
+              stroke="#2c3e50"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <path
+              d="M8 2V18"
+              stroke="#2c3e50"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <path
+              d="M16 6V22"
+              stroke="#2c3e50"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+          Карта перемещения
+        </div>
+        <canvas id="robotCanvas" width="400" height="400"></canvas>
+        <div class="map-legend">
+          <div class="legend-item">
+            <div class="legend-color" style="background-color: #3498db"></div>
+            <span>Траектория движения</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color" style="background-color: #e74c3c"></div>
+            <span>Текущая позиция</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Кнопки всякие -->
+      <div class="action-buttons">
+        <button id="analysisButton">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M16 12H21M12 16V21M8 8V3M4 12H3M8 12C8 14.2091 9.79086 16 12 16C14.2091 16 16 14.2091 16 12C16 9.79086 14.2091 8 12 8C9.79086 8 8 9.79086 8 12Z"
+              stroke="white"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+          Запустить анализ
+        </button>
+        <button id="stopButton" class="danger">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M18.364 18.364C21.8787 14.8492 21.8787 9.15076 18.364 5.63604C14.8492 2.12132 9.15076 2.12132 5.63604 5.63604C2.12132 9.15076 2.12132 14.8492 5.63604 18.364C9.15076 21.8787 14.8492 21.8787 18.364 18.364ZM18.364 18.364L5.63604 5.63604"
+              stroke="white"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+          Экстренная остановка
+        </button>
+      </div>
+    </div>
+
+    <script>
+      // Инициализация Socket.IO соединения
+      const socket = io("http://192.168.1.133:7777");
+
+      // Глобальный объект для хранения данных с джойстиков
+      let joystickData = {
+        joystick1: { x: 0, y: 0 },
+        joystick2: { x: 0, y: 0 },
+        buttons: {},
+        potentiometers: {},
+      };
+
+      // Глобальные переменные управления сервоприводами
+      let servoMode = 1;
+
+      let servo2Angle = 90; // Servo2 – камера (влево/вправо)
+      let servo3Angle = 90; // servo3 – камера (вверх/вниз)
+      let servo4Angle = 90; // Servo4 – манипулятор (вверх/вниз)
+      let servo7Angle = 90; // servo7 – манипулятор, 360° (скорость: 0 – максимум влево, 90 – стоп, 180 – максимум вправо)
+      let servo6Angle = 90; // Servo6 – захват (переключается кнопкой)
+      let servo1Angle = 90; // Servo1 – от потенциометра
+      let servo5Angle = 90; // Servo5 – от потенциометра
+
+      let previousServoToggle = false;
+
+      const deadZone = 0.15;
+      const deadZoneMove = 0.05;
+
+      let servo6AngleRate = 60;
+
+      // Обработка данных с контроллера, получаемых через electronAPI
+      window.electronAPI.onControllerData((data) => {
+        // Преобразование входящей структуры:
+        // Центрируем и нормализуем (исходим из диапазона ~0..1023, центр 512)
+        joystickData = {
+          joystick1: {
+            x: (data.joy1.x - 512) / 512,
+            y: (data.joy1.y - 512) / 512,
+            button: data.joy1.button,
+          },
+          joystick2: {
+            x: (data.joy2.x - 512) / 512,
+            y: (data.joy2.y - 512) / 512,
+            button: data.joy2.button,
+          },
+          buttons: {
+            modeSwitch: data.joy2.button, // используем кнопку joy2 для переключения режима
+            servoToggle: data.switch, // поле switch для переключения сервопривода 6
+          },
+          potentiometers: {
+            pot1: data.potentiometer,
+            pot2: data.potentiometer,
+          },
+        };
+
+        // Переключение режима сервоприводов (modeSwitch)
+        if (joystickData.buttons.modeSwitch !== undefined) {
+          if (joystickData.buttons.modeSwitch && !window.lastModeSwitchState) {
+            servoMode = servoMode === 1 ? 2 : 1;
+            showNotification("Переключен режим сервоприводов: " + servoMode);
+          }
+          window.lastModeSwitchState = joystickData.buttons.modeSwitch;
+        }
+
+        // Переключение сервопривода 6 (захват) по кнопке servoToggle
+        if (joystickData.buttons.servoToggle !== undefined) {
+          if (
+            joystickData.buttons.servoToggle != previousServoToggle &&
+            !window.lastServoToggleState
+          ) {
+            servo6Angle = servo6Angle < servo6AngleRate ? servo6AngleRate : 0;
+            socket.emit("set_servo", { servo_id: 5, value: servo6Angle });
+            showNotification("Сервопривод 6 переключен: " + servo6Angle);
+            previousServoToggle = joystickData.buttons.servoToggle;
+          }
+          window.lastServoToggleState = joystickData.buttons.servoToggle;
+        }
+      });
+
+      // Переменные управления движением
+      let currentCommand = { linear: 0.0, angular: 0.0 };
+      let maxLinearSpeed = parseFloat(
+        document.getElementById("linearSpeedSlider").value
+      );
+      let maxAngularSpeed = parseFloat(
+        document.getElementById("angularSpeedSlider").value
+      );
+      let servoSpeed = parseFloat(
+        document.getElementById("servoSpeedSlider").value
+      );
+      document.getElementById("linearSpeedValue").innerText =
+        maxLinearSpeed.toFixed(2) + " м/с";
+      document.getElementById("angularSpeedValue").innerText =
+        maxAngularSpeed.toFixed(2) + " рад/с";
+      document.getElementById("servoSpeedValue").innerText =
+        servoSpeed.toFixed(2) + " тиков";
+
+      // Поддержка клавиатуры (W, A, S, D)
+      const keysPressed = {};
+      document.addEventListener("keydown", function (event) {
+        const key = event.key.toLowerCase();
+        if (["w", "a", "s", "d"].includes(key)) {
+          if (keysPressed[key]) return;
+          keysPressed[key] = true;
+          updateMovementCommand();
+          sendMovementCommand();
+        }
+      });
+      document.addEventListener("keyup", function (event) {
+        const key = event.key.toLowerCase();
+        if (["w", "a", "s", "d"].includes(key)) {
+          delete keysPressed[key];
+          updateMovementCommand();
+          sendMovementCommand();
+        }
+      });
+
+      // Обработчики слайдеров для изменения скоростей
+      const linearSpeedSlider = document.getElementById("linearSpeedSlider");
+      const angularSpeedSlider = document.getElementById("angularSpeedSlider");
+      const servoSpeedSlider = document.getElementById("servoSpeedSlider");
+      linearSpeedSlider.addEventListener("input", function () {
+        maxLinearSpeed = parseFloat(this.value);
+        document.getElementById("linearSpeedValue").innerText =
+          maxLinearSpeed.toFixed(2) + " м/с";
+        updateMovementCommand();
+        sendMovementCommand();
+      });
+      angularSpeedSlider.addEventListener("input", function () {
+        maxAngularSpeed = parseFloat(this.value);
+        document.getElementById("angularSpeedValue").innerText =
+          maxAngularSpeed.toFixed(2) + " рад/с";
+        updateMovementCommand();
+        sendMovementCommand();
+      });
+
+      servoSpeedSlider.addEventListener("input", function () {
+        servoSpeed = parseFloat(this.value);
+        document.getElementById("servoSpeedValue").innerText =
+          servoSpeed.toFixed(2) + " тиков";
+        updateServoControls();
+      });
+
+      // Обновление команды движения с учетом joystick1
+      function updateMovementCommand() {
+        let linear = 0.0;
+        let angular = 0.0;
+
+        if (keysPressed["w"]) linear += maxLinearSpeed;
+        if (keysPressed["s"]) linear -= maxLinearSpeed;
+        if (keysPressed["a"]) angular += maxAngularSpeed;
+        if (keysPressed["d"]) angular -= maxAngularSpeed;
+
+        // Используем нормализованные данные joystick1
+        if (joystickData.joystick1) {
+          if (Math.abs(joystickData.joystick1.y) > deadZoneMove) {
+            linear = joystickData.joystick1.y * maxLinearSpeed;
+          }
+          if (Math.abs(joystickData.joystick1.x) > deadZoneMove) {
+            angular = -(joystickData.joystick1.x * maxAngularSpeed);
+          }
+        }
+        currentCommand.linear = linear;
+        currentCommand.angular = angular;
+        updateMovementIndicators();
+      }
+
+      function updateMovementIndicators() {
+        document.getElementById("currentLinear").innerText =
+          currentCommand.linear.toFixed(2) + " м/с";
+        document.getElementById("currentAngular").innerText =
+          currentCommand.angular.toFixed(2) + " рад/с";
+        let direction = "";
+        if (currentCommand.linear > 0) direction += "Движение вперёд";
+        else if (currentCommand.linear < 0) direction += "Движение назад";
+        if (currentCommand.angular > 0)
+          direction += (direction ? " + " : "") + "Поворот влево";
+        else if (currentCommand.angular < 0)
+          direction += (direction ? " + " : "") + "Поворот вправо";
+        if (direction === "") direction = "Ровер остановлен";
+        const directionIndicator =
+          document.getElementById("directionIndicator");
+        directionIndicator.innerText = direction;
+        if (direction === "Ровер остановлен") {
+          directionIndicator.style.backgroundColor = "rgba(44, 62, 80, 0.8)";
+        } else if (direction.includes("вперёд")) {
+          directionIndicator.style.backgroundColor = "rgba(39, 174, 96, 0.8)";
+        } else if (direction.includes("назад")) {
+          directionIndicator.style.backgroundColor = "rgba(231, 76, 60, 0.8)";
+        } else {
+          directionIndicator.style.backgroundColor = "rgba(52, 152, 219, 0.8)";
+        }
+      }
+
+      function sendMovementCommand() {
+        socket.emit("cmd_vel", {
+          linear: { x: currentCommand.linear, y: 0.0, z: 0.0 },
+          angular: { x: 0.0, y: 0.0, z: currentCommand.angular },
+        });
+      }
+
+      // Получение одометрии через Socket.IO
+      socket.on("odom_response", (data) => {
+        if (data.status && data.status === "error") {
+          console.error("Ошибка одометрии:", data.message);
+          return;
+        }
+        const x = data.pose.pose.position.x;
+        const y = data.pose.pose.position.y;
+        const thetaRad = Math.atan2(
+          2 *
+            (data.pose.pose.orientation.w * data.pose.pose.orientation.z +
+              data.pose.pose.orientation.x * data.pose.pose.orientation.y),
+          1 -
+            2 *
+              (data.pose.pose.orientation.y ** 2 +
+                data.pose.pose.orientation.z ** 2)
+        );
+        const thetaDeg = ((thetaRad * 180) / Math.PI).toFixed(1);
+        document.getElementById("odomX").innerText = x.toFixed(2) + " м";
+        document.getElementById("odomY").innerText = y.toFixed(2) + " м";
+        document.getElementById("odomTheta").innerText = thetaDeg + "°";
+
+        // Обновление положения для симуляции
+        robotState.x = canvas.width / 2 + x * scale;
+        robotState.y = canvas.height / 2 - y * scale;
+        robotState.theta = thetaRad;
+        trajectoryPoints.push({ x: robotState.x, y: robotState.y });
+        if (trajectoryPoints.length > 500) trajectoryPoints.shift();
+      });
+
+      // Запрашиваем одометрию каждые 100 мс
+      setInterval(() => {
+        socket.emit("get_odom");
+      }, 100);
+
+      // --- Управление сервомоторами ---
+      // Режимы:
+      // Режим 1: joystick2.x → Servo2 (камера), joystick2.y → servo3 (камера)
+      // Режим 2: joystick2.x → 360° servo7 (манипулятор), joystick2.y → Servo4 (манипулятор)
+      // Servo6 (захват) переключается кнопкой servoToggle
+      // Servo1 и Servo5 получают данные с потенциометров (pot1 и pot2)
+      let lastServoUpdateTime = performance.now();
+      function updateServoControls() {
+        const now = performance.now();
+        const deltaTime = (now - lastServoUpdateTime) / 1000.0;
+        lastServoUpdateTime = now;
+
+        if (joystickData.joystick2) {
+          if (servoMode === 1) {
+            // Режим 1: управление камерой
+            if (Math.abs(joystickData.joystick2.x) > deadZone) {
+              servo2Angle += -joystickData.joystick2.x * servoSpeed * deltaTime;
+              servo2Angle = Math.max(0, Math.min(180, servo2Angle));
+              socket.emit("set_servo", { servo_id: 1, value: servo2Angle });
+            }
+            if (Math.abs(joystickData.joystick2.y) > deadZone) {
+              servo3Angle += joystickData.joystick2.y * servoSpeed * deltaTime;
+              servo3Angle = Math.max(0, Math.min(180, servo3Angle));
+              socket.emit("set_servo", { servo_id: 2, value: servo3Angle });
+            }
+          } else if (servoMode === 2) {
+            // Режим 2: управление манипулятором
+            if (Math.abs(joystickData.joystick2.x) > deadZone) {
+              let servo7Speed = 90 + joystickData.joystick2.x * 90;
+              servo7Speed = Math.max(0, Math.min(180, servo7Speed));
+              servo7Angle = servo7Speed;
+              socket.emit("set_servo", { servo_id: 6, value: servo7Speed });
+            } else {
+              servo7Angle = 90;
+              socket.emit("set_servo", { servo_id: 6, value: 90 });
+            }
+            if (Math.abs(joystickData.joystick2.y) > deadZone) {
+              servo4Angle += joystickData.joystick2.y * servoSpeed * deltaTime;
+              servo4Angle = Math.max(0, Math.min(180, servo4Angle));
+              socket.emit("set_servo", { servo_id: 3, value: servo4Angle });
+            }
+          }
+        }
+
+        if (joystickData.potentiometers) {
+          if (
+            joystickData.potentiometers.pot1 !== undefined &&
+            servoMode == 1
+          ) {
+            servo1Angle =
+              (parseFloat(joystickData.potentiometers.pot1) / 1023) * 180;
+            servo1Angle = Math.max(0, Math.min(180, servo1Angle));
+            socket.emit("set_servo", { servo_id: 0, value: servo1Angle });
+          }
+          if (
+            joystickData.potentiometers.pot2 !== undefined &&
+            servoMode == 2
+          ) {
+            servo5Angle =
+              (parseFloat(joystickData.potentiometers.pot2) / 1023) * 180;
+            servo5Angle = Math.max(0, Math.min(180, servo5Angle));
+            socket.emit("set_servo", { servo_id: 4, value: servo5Angle });
+          }
+        }
+        console.log(
+          `Servo1 (pot1): ${servo1Angle}, Servo2 (камера x): ${servo2Angle}, ` +
+            `servo7 (манипулятор x, скорость): ${servo7Angle}, Servo4 (манипулятор y): ${servo4Angle}, ` +
+            `Servo5 (pot2): ${servo5Angle}, Servo6 (захват): ${servo6Angle}, servo3 (камера y): ${servo3Angle}`
+        );
+      }
+
+      // --- Симуляция и отрисовка на Canvas ---
+      const canvas = document.getElementById("robotCanvas");
+      const ctx = canvas.getContext("2d");
+      const robotState = {
+        x: canvas.width / 2,
+        y: canvas.height / 2,
+        theta: -Math.PI / 2,
+      };
+      const trajectoryPoints = [];
+      const scale = 25;
+      function drawGrid() {
+        const gridSize = 20;
+        const numCells = canvas.width / gridSize;
+        ctx.beginPath();
+        ctx.strokeStyle = "#e6e6e6";
+        ctx.lineWidth = 1;
+        for (let i = 0; i <= numCells; i++) {
+          const x = i * gridSize;
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, canvas.height);
+        }
+        for (let i = 0; i <= numCells; i++) {
+          const y = i * gridSize;
+          ctx.moveTo(0, y);
+          ctx.lineTo(canvas.width, y);
+        }
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.strokeStyle = "#bdc3c7";
+        ctx.lineWidth = 2;
+        ctx.moveTo(canvas.width / 2, 0);
+        ctx.lineTo(canvas.width / 2, canvas.height);
+        ctx.moveTo(0, canvas.height / 2);
+        ctx.lineTo(canvas.width, canvas.height / 2);
+        ctx.stroke();
+      }
+      function drawTrajectory() {
+        if (trajectoryPoints.length < 2) return;
+        ctx.beginPath();
+        ctx.moveTo(trajectoryPoints[0].x, trajectoryPoints[0].y);
+        for (let i = 1; i < trajectoryPoints.length; i++) {
+          ctx.lineTo(trajectoryPoints[i].x, trajectoryPoints[i].y);
+        }
+        ctx.strokeStyle = "#3498db";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+      function drawRobot() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawGrid();
+        drawTrajectory();
+        ctx.beginPath();
+        ctx.arc(robotState.x, robotState.y, 12, 0, 2 * Math.PI);
+        ctx.fillStyle = "#e74c3c";
+        ctx.fill();
+        ctx.strokeStyle = "#c0392b";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.beginPath();
+        const arrowLength = 20;
+        const endX = robotState.x + arrowLength * Math.cos(robotState.theta);
+        const endY = robotState.y + arrowLength * Math.sin(robotState.theta);
+        ctx.moveTo(robotState.x, robotState.y);
+        ctx.lineTo(endX, endY);
+        ctx.strokeStyle = "#2c3e50";
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        const headLength = 8;
+        const angle = Math.atan2(endY - robotState.y, endX - robotState.x);
+        ctx.beginPath();
+        ctx.moveTo(endX, endY);
+        ctx.lineTo(
+          endX - headLength * Math.cos(angle - Math.PI / 6),
+          endY - headLength * Math.sin(angle - Math.PI / 6)
+        );
+        ctx.lineTo(
+          endX - headLength * Math.cos(angle + Math.PI / 6),
+          endY - headLength * Math.sin(angle + Math.PI / 6)
+        );
+        ctx.closePath();
+        ctx.fillStyle = "#2c3e50";
+        ctx.fill();
+      }
+      function updateSimulation(timestamp) {
+        updateServoControls();
+        updateMovementCommand();
+        sendMovementCommand();
+        drawRobot();
+        updateJoystickDisplay();
+
+        // console.log(servoSpeed);
+
+        setTimeout(() => {
+          requestAnimationFrame(updateSimulation);
+        }, 100);
+      }
+      requestAnimationFrame(updateSimulation);
+
+      // Функция показа уведомлений
+      function showNotification(message, isError = false) {
+        const notification = document.createElement("div");
+        notification.style.position = "fixed";
+        notification.style.bottom = "20px";
+        notification.style.right = "20px";
+        notification.style.padding = "15px 20px";
+        notification.style.backgroundColor = isError ? "#e74c3c" : "#2ecc71";
+        notification.style.color = "white";
+        notification.style.borderRadius = "4px";
+        notification.style.boxShadow = "0 4px 6px rgba(0, 0, 0, 0.1)";
+        notification.style.zIndex = "1000";
+        notification.style.transition = "all 0.3s ease";
+        notification.textContent = message;
+        document.body.appendChild(notification);
+        setTimeout(() => {
+          notification.style.opacity = "0";
+          setTimeout(() => {
+            document.body.removeChild(notification);
+          }, 300);
+        }, 3000);
+      }
+
+      // Функция остановки ровера (сброс команд)
+      function stopRover() {
+        for (let k in keysPressed) delete keysPressed[k];
+        currentCommand.linear = 0.0;
+        currentCommand.angular = 0.0;
+        updateMovementIndicators();
+        sendMovementCommand();
+      }
+      document.getElementById("stopButton").addEventListener("click", () => {
+        stopRover();
+        showNotification("Ровер остановлен");
+      });
+      document
+        .getElementById("analysisButton")
+        .addEventListener("click", () => {
+          window.electronAPI
+            .runAnalysis()
+            .then(() => {
+              console.log("Анализ завершён");
+              showNotification("Анализ успешно завершён");
+            })
+            .catch((err) => {
+              console.error("Ошибка при запуске анализа:", err);
+              showNotification("Ошибка при запуске анализа", true);
+            });
+        });
+
+      /*
+      КРАСИВОЕ ОТОБРАЖЕНИЕ ДАННЫХ С КОНТРОЛЛЕРА
+      */
+
+      // Функция обновления позиции ручки джойстика
+      function updateJoystickPosition(joystickElement, x, y) {
+        const container = joystickElement.parentElement;
+        const rect = container.getBoundingClientRect();
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
+
+        // Ограничиваем положение стика в пределах круга
+        const radius = rect.width / 2 - 20; // 20px - половина ширины ручки
+        const distance = Math.sqrt(x * x + y * y) * radius;
+        const angle = Math.atan2(y, x);
+        let posX, posY;
+
+        if (distance > radius) {
+          posX = Math.cos(angle) * radius;
+          posY = Math.sin(angle) * radius;
+        } else {
+          posX = x * radius;
+          posY = y * radius;
+        }
+
+        joystickElement.style.left = `${centerX + posX}px`;
+        joystickElement.style.top = `${centerY + posY}px`;
+      }
+
+      // Функция обновления отображения потенциометра
+      function updatePotentiometer(value) {
+        // Нормализуем значение (0-1023) в проценты
+        const percent = (value / 1023) * 100;
+        document.getElementById("potFill").style.width = `${percent}%`;
+        document.getElementById("potValue").textContent = `${Math.round(
+          percent
+        )}% (${value})`;
+      }
+
+      // Функция обновления состояния кнопок
+      function updateButtons(modeState, servoState) {
+        const modeButton = document.getElementById("modeButton");
+        const servoButton = document.getElementById("servoButton");
+
+        if (modeState) {
+          modeButton.classList.add("active");
+        } else {
+          modeButton.classList.remove("active");
+        }
+
+        if (servoState) {
+          servoButton.classList.add("active");
+        } else {
+          servoButton.classList.remove("active");
+        }
+      }
+
+      // Функция обновления режима серво
+      function updateServoMode(mode) {
+        const modeIndicator = document.getElementById("servoMode");
+        modeIndicator.textContent = `Режим ${mode}`;
+      }
+
+      // Функция обновления визуализации данных джойстика
+      function updateJoystickDisplay() {
+        // Обновляем позиции джойстиков
+        updateJoystickPosition(
+          document.getElementById("joystick1"),
+          joystickData.joystick1.x,
+          -joystickData.joystick1.y
+        );
+        updateJoystickPosition(
+          document.getElementById("joystick2"),
+          joystickData.joystick2.x,
+          -joystickData.joystick2.y
+        );
+
+        // Обновляем числовые значения
+        document.getElementById("joy1X").textContent =
+          joystickData.joystick1.x.toFixed(2);
+        document.getElementById("joy1Y").textContent =
+          joystickData.joystick1.y.toFixed(2);
+        document.getElementById("joy2X").textContent =
+          joystickData.joystick2.x.toFixed(2);
+        document.getElementById("joy2Y").textContent =
+          joystickData.joystick2.y.toFixed(2);
+
+        // Обновляем состояние кнопок
+        updateButtons(
+          joystickData.buttons.modeSwitch,
+          joystickData.buttons.servoToggle
+        );
+
+        // Обновляем потенциометр
+        updatePotentiometer(joystickData.potentiometers.pot1);
+      }
+
+      // Обновляем режим в зависимости от состояния кнопки режима
+      setInterval(() => {
+        updateServoMode(servoMode);
+      }, 200);
+    </script>
+  </body>
+</html>
